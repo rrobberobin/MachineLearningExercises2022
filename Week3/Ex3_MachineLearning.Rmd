@@ -1,0 +1,339 @@
+---
+title: "Machine Learning - Exercise 3"
+author: "Robin Perälä 175910"
+date: "18.4.2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Task 1 (short questions)
+*Answer the following questions with short answers. Motivate your answers. Answer with no more than 10 sentences.*
+
+a) *What is the main difference between supervised learning models and unsupervised learning models?*
+
+Supervised learning models try to predict the effect of independent variables on the dependent variable y. 
+
+Unsupervised learning models do not have a dependent variable.
+They can instead be used to understand the data, e.g. by clustering.
+
+b) *What are the main differences (e.g., clusters, starting point for algorithm, algorithm itself, etc.) between k-means clustering and hierarchical clustering?*
+
+K-means clustering partitions the data into a specified amount of clusters k, while the number of partitions is not a parameter of the hierarchical clustering algorithm.
+Instead the hierarchical clustering creates a dendrogram which can afterwards be cut into clusters. The leaves with the shortest branches in the dendrogram represent observations that are similar to each other.
+
+K-means clustering starts by randomly assigning data points into k clusters. 
+After that the algorithm reassignes the data points iteratively into the cluster with the nearest centroid, 
+until finally finding the local minimum of the within sum of squares.
+
+There is no random assignment for hierarchical clustering.
+Instead it starts by treating all data points as their own cluster. 
+Then the algorithm one by one checks the distance (e.g. Euclidean) between all clusters 
+and merges the closest two clusters into one. 
+When there's only one cluster left, the algorithm is complete.
+
+Both try to minimize a measure for the distance within clusters, e.g. Euclidean.
+
+c) *Give an example of where an unsupervised model is used in real-world setting such as a company (come up with an own example).*
+
+Cluster analysis can be used for finding people with similar interests. 
+On a simple level: people who like to watch baseball on tv would be put into one group. 
+On a more advanced level: people who have similar personalities and are emotionally in a similar situation would be put into the same group. 
+This could be extended for finding dating partners. 
+(Although a possible issue could be seen in only meeting similar people. 
+Meeting different people could be seen as a good thing)
+
+Some financial applications would be to cluster stocks with similar characteristics 
+or clustering the economy into segments
+
+\pagebreak
+
+
+# Task 2 (PCA)
+
+### Load data and preparation
+```{r prepare, warning=FALSE, message=FALSE}
+rm(list=ls())   #clear environment
+set.seed(707)     #random seed for reproducibility
+
+library(haven)  #For importing Stata data
+library(tibble) #For transforming columns to rownames
+library(glmnet) #For Lasso and Ridge regression
+library(pls)    #For principal component regression
+
+#Load Stata data with read_dta function from haven
+USCompanies_data_winsorized = read_dta("USCompanies_data_winsorized.dta")
+USDataNoNA = na.omit(USCompanies_data_winsorized)
+
+```
+
+a) *Your first task is to assign the variable conm as the row identifier (this can be done using e.g., ”column_to_rownames” option in ”tibble” and ”tidyverse” packages). If you do this step correctly, you should see the companynames as row identifiers, and their names should show in the PCA plot.*
+
+```{r 2a}
+USData = column_to_rownames(USDataNoNA, var = "conm")
+
+```
+
+b) *Estimate a Principal Component Analysis (PCA). Report the principal component loadings for the first three principal components.*
+
+```{r 2b}
+
+myPCA = prcomp(USData, scale=TRUE)
+PCA123 = myPCA$rotation[,c("PC1", "PC2", "PC3")]
+PCA123
+
+```
+
+c) *Plot a principal component plot, where the x-axis show PC1 loadings and the y-axis shows PC2 loadings. The command for this is ”biplot()”. (Note that the plot will most likely look a bit messy as there as so many companies in the database)*
+
+```{r 2c}
+
+biplot(myPCA, scale=0)
+
+```
+
+
+d) *Calculate the proportion of variance explained (PVE) for the first three principal components. Report these PVEs, as well as the cumulative PVE.*
+```{r 2d}
+
+#Variance
+myPCA$var=(myPCA$sdev)^2
+
+#PVE for all PCs
+PVE = myPCA$var/sum(myPCA$var)
+
+#PVE for the first three PCs and cumulative PVE
+PVE123 = PVE[1:3]
+cumsum123 = cumsum(myPCA$var[1:3])/sum(myPCA$var)
+
+PVEtable = rbind(round(PVE123, 4), 
+                 round(cumsum123, 4))
+
+colnames(PVEtable) = colnames(PCA123)
+rownames(PVEtable) = c("PVE", "Cumulative PVE")
+print(PVEtable)
+
+
+```
+
+
+e) *Show plots for the PVE and the cumulative PVE (so-called ”scree plots”) respectively. The x-axis should show the number of principal components and the y-axis should show the percentage of variance explained (PVE).*
+```{r 2e}
+
+plot(PVE, xlab="Principal Component", ylab="Proportion of Variance Explained", 
+     ylim=c(0,1), type="b")
+
+plot(cumsum(PVE), xlab="Principal Component", ylab="Cumulative Proportion of Variance Explained", 
+     ylim=c(0,1), type="b")
+
+```
+
+
+f) *Searching for the ”elbow” in a scree plot is an ad-hoc approach of choosing the number of important principal components. Based on your plots in e), how many principal components appear to be important (i.e., where is the ”elbow” in the scree plot)?*
+
+Searching for the "elbow" means eye-balling an optimal amount of principal components. This is done by looking at their proportion of variance explained and seeing where the marginal benefit of adding another component diminishes.
+
+Looks like after the first component the marginal benefit is small.
+To be on the safer side we will use two variables
+
+\pagebreak
+
+
+
+# Task 3 (Cluster analysis)
+
+*Cluster analysis. In this step, use only information for two variables, namely, roa_w and pe_w.*
+
+a) *Use k-means clustering to separate firms into two clusters (K=2). Use 1 random assignment. Show a plot of the results.*
+```{r 3a, warning=FALSE, message=FALSE}
+
+x=USData[,c("roa_w", "pe_w")]
+kmOut2C1R=kmeans(x, centers=2, nstart=1)
+head(kmOut2C1R$cluster)
+
+plot(x, col=(kmOut2C1R$cluster+1), main="K-Means Clustering
+Results with K=2", xlab="", ylab="", pch=20, cex=2)
+
+```
+
+
+b) *Use k-means clustering to separate firms into two clusters (K=2). Use 10 random assignments. Show a plot of the results.*
+```{r 3b}
+
+kmOut2C10R=kmeans(x, centers=2, nstart=10)
+head(kmOut2C10R$cluster)
+
+plot(x, col=(kmOut2C10R$cluster+1), main="K-Means Clustering
+Results with K=2", xlab="", ylab="", pch=20, cex=2)
+
+```
+
+
+c) *Compare the within-cluster sum of squares for the clustering results in a) versus b). What do these numbers explain and why do they differ (note that they do not have to differ).*
+
+```{r 3c}
+
+kmOut2C1R$withinss
+kmOut2C10R$withinss
+
+```
+
+The within-cluster sum of squares measures the squared Euclidean distance between
+all data points in the cluster. 
+All these distances are then summed to obtain the within-cluster sum of squares
+
+The results are exactly the same. They do not differ using our random seed. 
+The results depend on which seed we are using. 
+When using 10 random assignments and choosing the best one,
+the result is usually more stable and less dependent on randomness. 
+The model using only one assignment will be more dependent on randomness.
+
+
+d) *Use k-means clustering to separate firms into six clusters (K =6). Use 10 random assignments. Show a plot of the results.*
+```{r 3d}
+kmOut6C10R=kmeans(x, centers=6, nstart=10)
+head(kmOut6C10R$cluster)
+
+plot(x, col=(kmOut6C10R$cluster+1), main="K-Means Clustering
+Results with K=6", xlab="", ylab="", pch=20, cex=2)
+
+```
+\pagebreak
+
+
+# Task 4 (Lasso, Ridge and PCR)
+
+*In this exercise, we will compare the prediction performance of Lasso regression, Ridge regression, and Principal Component Regression (PCR) in predicting roa_w. Since the sample is rather large, we will hold out a test data set throughout this question. This will be used to compare the performance of the three models.* 
+
+*To do this, use the validation set approach to split the original sample (used in question 2) into two parts. Assign half (or some portion) of the observations to a training set, and assign the remaining observations to the test set. Keep the test set the same throughout this question.*
+
+```{r 4prep, warning=FALSE, message=FALSE}
+y = USData$roa_w
+x = model.matrix(roa_w~., USData)[,-1]
+
+#Validation set (50-50 split)
+train=sample(c(TRUE, FALSE), nrow(USData), rep=TRUE)
+test = !train
+
+```
+
+
+a) *Train the model on the training data using Lasso regression. Find the best lambda (tuning parameter).*
+
+```{r 4a, warning=FALSE, message=FALSE}
+#Use function glmnet (from library glmnet) to perform Lasso regression. Alpha=1 is Lasso
+lasso = glmnet(x[train,], y[train], 
+               alpha=1, standardize=TRUE)
+
+#Find best lambda using 10-fold Cross-Validation
+lassoCV=cv.glmnet(x[train,], y[train], alpha=1, standardize=TRUE, nfolds=10)
+
+#Best tuning parameter (lambda)
+signif(lassoCV$lambda.min, 4)
+
+#Plot the coefficients against L1 norm
+plot(lasso)
+
+#Plot the coefficients against lambda
+#ggplot for nicer plotting
+library(ggplot2); library(data.table)
+coefNLambda = as.data.frame(t(as.matrix(coef(lasso)[-1,])))
+coefNLambda$Lambda = lasso$lambda
+
+coefNLambda = melt.data.table(data=data.table(coefNLambda), 
+                              id.vars='Lambda', 
+                              variable.name='variable')
+
+ggplot(data=coefNLambda, aes(x=Lambda, y=value, col=variable)) + geom_line() + xlab("Coefficient")
+
+
+```
+
+
+b) *Train the model on the training data using Rdige regression. Find the best lambda (tuning parameter).*
+
+```{r 4b}
+#Use function glmnet (from library glmnet) to perform Ridge regression. Alpha=0 is Ridge
+ridge = glmnet(x[train,], y[train], 
+               alpha=0, standardize=TRUE)
+
+#Find best lambda using 10-fold Cross-Validation
+ridgeCV=cv.glmnet(x[train,], y[train], alpha=0, standardize=TRUE, nfolds=10)
+
+#Best tuning parameter (lambda)
+signif(ridgeCV$lambda.min, 4)
+
+#Plot the coefficients against L1 norm
+plot(ridge)
+
+#Plot the coefficients against lambda
+#ggplot for nicer plotting
+library(ggplot2); library(data.table)
+coefNLambda = as.data.frame(t(as.matrix(coef(ridge)[-1,])))
+coefNLambda$Lambda = ridge$lambda
+
+coefNLambda = melt.data.table(data=data.table(coefNLambda), 
+                              id.vars='Lambda', 
+                              variable.name='variable')
+
+ggplot(data=coefNLambda, aes(x=Lambda, y=value, col=variable)) + geom_line() + xlab("Coefficient")
+
+
+```
+
+
+c) *Train the model on the training data using Principal Component Regression (PCR). Present a validation plot. Use the scree plot to decide on an optimal number of principal components by identifiying where there is a ”elbow” in the scree plot. Report this number.*
+
+```{r 4c}
+#PCR Regression using function pcr (part of pls library)
+PCRfit=pcr(roa_w~., data=USData, scale=TRUE, subset=train, validation ="CV")
+
+#Validation plot
+validationplot(PCRfit, val.type="MSEP")
+
+#Scree plotting
+PVE=PCRfit$Xvar/PCRfit$Xtotvar
+plot(PVE, xlab="Principal Component", ylab="Proportion of Variance Explained", 
+     ylim=c(0,1), type="b")
+plot(cumsum(PVE), xlab="Principal Component", ylab="Cumulative Proportion of Variance Explained", 
+     ylim=c(0,1), type="b")
+
+
+```
+
+There is an elbow after the first component 
+To be safer, we use two components in the following task
+
+d) *Compare the three models in a)-c) by calculating the test MSE using the test data that was held out in using the validation set approach. Report the test MSEs. Which model performs best?*
+
+```{r 4d}
+
+#Using best lambda
+lassoPred=predict(lasso, s=lassoCV$lambda.min, newx=x[test,])
+lassoMSE=mean((lassoPred-y[test])^2)
+
+#Using best lambda
+ridgePred=predict(ridge, s=ridgeCV$lambda.min, newx=x[test,])
+ridgeMSE=mean((ridgePred-y[test])^2)
+
+#Using 2 PCAs
+PCRpred=predict(PCRfit, x[test,], ncomp=2)
+PCRMSE = mean((PCRpred -y[test])^2)
+
+MSEtable = cbind(round(lassoMSE, 4), 
+                 round(ridgeMSE, 4), 
+                 round(PCRMSE, 4))
+colnames(MSEtable) = c("Lasso", "Ridge", "PCR")
+rownames(MSEtable) = c("MSE")
+print(MSEtable)
+
+```
+
+Lasso performs best, with ridge a close second.
+PCR is performing poorly because we only use two components.
+Choosing the number of PCR components based on a Cross-Validation would improve prediction performance.
+
+\pagebreak
+
+
+

@@ -1,6 +1,5 @@
 ---
 title: "Machine Learning - Exercise 4"
-author: "Robin Perälä 175910"
 date: "21.4.2022"
 output:
   pdf_document: default

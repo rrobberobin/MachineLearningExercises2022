@@ -1,0 +1,305 @@
+---
+title: "Machine Learning - Exercise 2"
+date: "12.4.2022"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+
+# 1. 
+##### ISLR, Exercise 5.4.2, p. 219-220.
+*We will now derive the probability that a given observation is part of a bootstrap sample. Suppose that we obtain a bootstrap sample from a set of n observations.*
+
+(a) *What is the probability that the first bootstrap observation is not the jth observation from the original sample? Justify your answer.*
+
+If we have n observations and draw a random draw from them, the probability to obtain the jth observation (a specific one) is 1/n. The complement of that is the probability to not obtain the jth observation. The complement is defined as $1 - 1/n = (n-1)/n$.
+
+Give formulas and use correct wording (permutations)...
+
+
+
+
+
+
+
+
+
+
+(b) *What is the probability that the second bootstrap observation is not the jth observation from the original sample?*
+
+Bootstap samples are drawn with replacement, so the probabilities of each draw is the same. The probability is (n-1)/n
+
+
+(c) *Argue that the probability that the jth observation is not in the bootstrap sample is (1 - 1/n)^n.*
+
+If the probability that the jth observation is (n-1)/n for one specific draw, then we compute the probability that is not in any of the draws by multiplying. $(n-1)/n * (n-1)/n * ... * (n-1)/n$ (not in the first draw, and not in the second draw, ... , an not in the last draw). Bootstrap sampling uses the same sample size as the original sample (n). This means that we have ((n-1)/n)^n. (n-1)/n can also be written as 1 - 1/n, which means that we have (1-1/n)^n.
+
+
+(d) *When n = 5, what is the probability that the jth observation is in the bootstrap sample?*
+
+We use the complement
+$1 - (1-1/n)^n = 1 - (1-1/5)^5 = 1 - (4/5)^5 = 0.67232$
+
+
+(e) *When n = 100, what is the probability that the jth observation is in the bootstrap sample?*
+
+$1 - (99/100)^{100} = 0.6339677$
+
+
+(f) *When n = 10, 000, what is the probability that the jth observation is in the bootstrap sample?*
+
+$1 - (9999/10000)^{10000} = 0.632139$
+When n grows bigger, the probability is getting ever closer to 1 - 1/e
+
+
+(g) *Create a plot that displays, for each integer value of n from 1 to 100, 000, the probability that the jth observation is in the bootstrap sample. Comment on what you observe.*
+
+```{r 1g}
+
+n = 1:100000
+probs = 1 - ((n-1)/n)^{n}
+plot(n, probs, log='xy')
+
+```
+
+
+(h) *We will now investigate numerically the probability that a bootstrap sample of size n = 100 contains the jth observation. Here j = 4. We repeatedly create bootstrap samples, and each time we record whether or not the fourth observation is contained in the bootstrap sample. Comment on the results obtained.*
+
+```{r 1h}
+
+set.seed(1)
+store=rep(NA, 10000)
+for(i in 1:10000){
+  store[i]=sum(sample(1:100, rep=TRUE)==4)>0
+}
+mean(store) #0.6405
+
+#Which is getting ever closer to 1 - 1/e
+1-1/exp(1) #0.63212...
+
+```
+\pagebreak
+
+
+# 2.
+*Suppose that n = 10 and the observations are*
+6.45, 1.28, -3.48, 2.44, -5.17, -1.67, -2.03, 3.58, 0.74, -2.14
+*Write a script in R to simulate the fraction of the original observations not contained in a bootstrap sample. Use B = 10 000 bootstrap replications. Compare with the approximation 10/3.*
+
+```{r 2}
+
+set.seed(1)
+n=10
+obs = c(6.45, 1.28, -3.48, 
+        2.44, -5.17, -1.67, 
+        -2.03, 3.58, 0.74, -2.14)
+
+store=rep(NA, 10000)
+for(i in 1:10000){
+  store[i]= (n - sum(obs %in% sample(obs, size=10, rep=TRUE)))/n
+}
+mean(store)
+
+
+#If we compare the mean value of observations included in the bootstrap (instead of the fraction) it is
+mean(store)*n
+
+#Which is close to
+10/3
+
+
+```
+\pagebreak
+
+
+# 3 
+##### ISLR, Exercise 8.4.2, p. 361
+*It is mentioned in Section 8.2.3 that boosting using depth-one trees (or stumps) leads to an additive model: that is, a model of the form*
+
+$$f(X) = \sum_{j=1}^p  f_j(X_j).$$
+
+*Explain why this is the case. You can begin with (8.12) in Algorithm 8.2.*
+
+\n
+\n
+Equation 8.12:
+$\hat f(x) = \sum_{b=1}^B  \lambda \hat f^b(x)$
+
+
+<!-- We are doing this summation for all bags -->
+<!-- $\hat f(x) = \lambda  \sum_{b=1}^B (c_{1_b} \cdot I_{(X \in R_1)} + c_{2_b}   \cdot I_{(X \in R_2)})$ -->
+
+<!-- Because each bag is split on one variable it leads to -->
+<!-- $\hat f(x) = \lambda  \sum_{j=1}^p (c_{1_b} \cdot I_{(X \in R_1)} + c_{2_b}   \cdot I_{(X \in R_2)})$ -->
+
+
+
+$$
+\begin{equation}
+
+\text{A stepwise solution:}\\
+\text{A regular tree can be defined as}\\
+f(X) = \sum_{m=1}^M c_m · 1_{(X \in R_m),}\\
+\text{where M is the number of partitions, which for a stump is two}\\
+\hat f^b(x) = c_{1_b} \cdot I_{(X \in R_1)} + c_{2_b}   \cdot I_{(X \in R_2).}\\
+
+\text{We can insert this into equation 8.12}\\
+\hat f(x) = \sum_{b=1}^B  \lambda \hat f^b(x) \\
+=\sum_{b=1}^B \lambda(\alpha_b \cdot I(X_{j_b}<s_b) + \beta_b \cdot I(X_{j_b} \ge s_b)).\\
+
+\lambda \text{ is a constant and can be moved outside the summation}\\
+= \lambda \sum_{b=1}^B \alpha_b \cdot I(X_{j_b}<s_b) + \beta_b \cdot I(X_{j_b} \ge s_b).\\
+
+\text{Because}\\
+X_{j_1}, X_{j_2}, ..., X_{j_B} \in \{X_1, X_2, ..., X_p\},\\
+\text{boosting using stumps leads to the additive model}\\
+f(X) = \sum_{j=1}^p  f_j(X_j).
+
+
+\end{equation}
+$$
+
+\pagebreak
+
+
+
+
+
+
+# 4.
+*Use the data USCompaniesdata.dta. Create a training set containing half of the observations, and a test set containing the remaining observations. Fit a tree with Return on Assets (roa_w) as the response and the other variables as predictors.*
+
+
+```{r prep} 
+library(haven) #For importing Stata data
+library(tree) #For fitting trees
+library(randomForest) #For bagging and randomforests
+library(gbm) #For boosting
+
+#Load Stata data with read_dta function from haven
+USCompanies_data_winsorized = read_dta("USCompanies_data_winsorized.dta")
+USData = subset(USCompanies_data_winsorized, select = -conm)
+USData = na.omit(USData)
+
+#Split into training and test set
+set.seed(1)
+train <- sample(1:nrow(USData), nrow(USData)/2)
+test <- (-train)
+
+# set.seed(1)
+# train=sample(c(TRUE, FALSE), nrow(USData), rep=TRUE)
+# test = !train
+
+```
+
+
+```{r 4}
+#Fit a tree using function "tree" (in library "tree")
+treeROA = tree(roa_w~. , USData, subset=train)
+summary(treeROA)
+#treeROA
+
+#Plot
+plot(treeROA); text(treeROA, pretty=0, cex=0.7, srt=25)
+
+#MSE
+yhat=predict(treeROA, newdata=USData[-train,])
+ROAtest=USData[-train, "roa_w"]
+plot(yhat, ROAtest$roa_w, ylab = "roa_w")
+abline(0,1)
+mean((yhat-ROAtest$roa_w)^2)
+
+```
+\pagebreak
+
+
+
+# 5.
+*Apply bagging to USCompaniesdata.dta. Compare the MSE of the tree in Exercise 4 with the MSE of the bagged trees.*
+```{r 5}
+#Bagging
+
+#Bagging using the function randomForest,
+#inside the randomForest library. When mtry is for all variables, it is bagging. 
+bagROA = randomForest(roa_w~., USData, subset=train, mtry=ncol(USData)-1, importance =TRUE)
+bagROA
+plot(bagROA)
+
+#MSE
+yhat=predict(bagROA, newdata=USData[-train,])
+ROAtest=USData[-train, "roa_w"]
+plot(yhat, ROAtest$roa_w)
+abline(0,1)
+mean((yhat-ROAtest$roa_w)^2)
+
+```
+\pagebreak
+
+
+# 6.
+*Apply random forests to USCompaniesdata.dta. Does random forests provide an improvement over the bagged trees in Exercise 5?*
+```{r 6}
+#Random forests
+
+set.seed(1)
+#Fit a random forest using the function randomForest,
+#inside the randomForest library. When mtry is less than
+#than all variables in the data, it is a random forests model
+forestROA = randomForest(roa_w~., USData, subset=train, importance = TRUE)
+
+#Should be done on several different mtry
+#sqrt(ncol(USData))
+#ncol(USData)/3
+
+forestROA
+plot(forestROA)
+
+importance(forestROA)
+varImpPlot(forestROA)
+
+#MSE
+yhat=predict(forestROA, newdata=USData[-train,])
+ROAtest=USData[-train, "roa_w"]
+plot(yhat, ROAtest$roa_w)
+abline(0,1)
+mean((yhat-ROAtest$roa_w)^2)
+
+```
+\pagebreak
+
+
+
+# 7. 
+*Apply boosting to USCompaniesdata.dta. Which variables are the most important predictors in the boosted model?*
+```{r 7}
+#Boosting
+set.seed(1)
+#Boosting using the "gbm" function inside the "gbm" library
+boostROA = gbm(roa_w~., USData[train,], distribution="gaussian", n.trees=500, interaction.depth=4, shrinkage = 0.1)
+#all or only training set? cv.folds? check help(gbm)
+#We use cross-validation to select B.
+
+
+boostROA
+summary(boostROA)
+plot(boostROA, i="profit_margin_w"); plot(boostROA, i="ebitda_w")
+
+#MSE
+yhat=predict(boostROA, newdata=USData[-train,])
+ROAtest=USData[-train, "roa_w"]
+plot(yhat, ROAtest$roa_w)
+abline(0,1)
+mean((yhat-ROAtest$roa_w)^2)
+
+
+
+```
+
+
+
+
